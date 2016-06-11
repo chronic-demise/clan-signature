@@ -1,5 +1,5 @@
 RewriteEngine On
 
 # Since phpBB and other forums expect image URLs to end with a common image extension,
-# we have a rewrite rule that lets requests to somefile.png be handled by somefile.php.
-RewriteRule (([a-z0-9\+\-])+)\.png$ $1.php
+# we have a rewrite rule that lets requests to banner.png be handled by generate.php.
+RewriteRule banner.png$ generate.php
