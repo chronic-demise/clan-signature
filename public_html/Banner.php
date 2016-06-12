@@ -84,7 +84,7 @@ class Banner {
         if ($this->user["Clan"]) {
             $this->clan = $this->parser->getClan($this->user["Clan"]);
         }
-        $this->theme = self::THEMES[min(max($theme, 0), count(self::THEMES))];
+        $this->theme = self::THEMES[min(max($theme, 0), count(self::THEMES) - 1)];
     }
     
     /*****************************************************************************/
@@ -190,8 +190,6 @@ class Banner {
             $motifW = imagesx($motif);
             $motifH = imagesy($motif);
             
-            //$scale = 0.85 * $scale;
-            
             $resizedMotifW = 0.7 * $width;
             $resizedMotifH = 0.7 * $motifH * ($width / $motifW);
             $xOffset = ($resizedBarW - $resizedMotifW) / 2;
@@ -214,13 +212,15 @@ class Banner {
         imagecopyresized($img, $bg, $x, $y, 0, 0, imagesx($bg) * $scale, imagesy($bg) * $scale, imagesx($bg), imagesy($bg));
         
         $avatar = @imagecreatefrompng($this->parser->getUserAvatar($this->user["Name"]));
-        imagecopyresized($img, $avatar, $x, $y, 0, 0, imagesx($avatar) * $scale, imagesy($avatar) * $scale, imagesx($avatar), imagesy($avatar));
+        if ($avatar !== false) {
+            imagecopyresized($img, $avatar, $x, $y, 0, 0, imagesx($avatar) * $scale, imagesy($avatar) * $scale, imagesx($avatar), imagesy($avatar));
+            imagedestroy($avatar);
+        }
         
         $frame = @imagecreatefrompng(self::RESOURCE_DIR . "avatar_frame.png");
         imagecopyresized($img, $frame, $x, $y, 0, 0, imagesx($frame) * $scale, imagesy($frame) * $scale, imagesx($frame), imagesy($frame));
         
         imagedestroy($bg);
-        imagedestroy($avatar);
         imagedestroy($frame);
     }
     

@@ -244,7 +244,6 @@ class HiscoreParser {
     private function getAvatarForUser($username) {
         $name = $this->getNameForURL($username);
         $url = str_replace("{user}", $name, self::USER_AVATAR_URL);
-        
         return $this->fetch($url);
     }
     
@@ -266,10 +265,10 @@ class HiscoreParser {
         $clan = [];
         $clan["Name"] = $clanName;
         $clan["Metadata"]["LastUpdated"] = $lastUpdated;
-        
         $lines = explode("\n", file_get_contents($dataFile));
         
         $clan["Members"] = [];
+        $clan["Metadata"]["Whitelist"] = [];
         for ($i = 1; $i < count($lines); $i++) {
             if ($lines[$i] === "") {
                 continue;
@@ -282,6 +281,7 @@ class HiscoreParser {
                 "Kills" => $member[3],
             ];
             $clan["Members"][] = $memberData;
+            $clan["Metadata"]["Whitelist"][] = strtolower(str_replace("\xA0", " ", $memberData["Name"]));
         }
         
         return $clan;
@@ -429,7 +429,10 @@ class HiscoreParser {
      * Returns the URL-friendly name for the given user/clan.
      */
     private function getNameForURL($name) {
-        return urlencode(strtolower(trim($name)));
+        if (!preg_match("/^[a-zA-Z0-9\+]+$/", $name)) {
+            return urlencode(strtolower(trim($name)));
+        }
+        return $name;
     }
 }
 
