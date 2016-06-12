@@ -11,10 +11,9 @@ store any generated images, but regenerates the image from new or cached data. T
 
 ## Demo
 
-![Berserkguard](http://berserkguard.com/random/cd/sig/banner.png?user=Berserkguard "Berserkguard")
-![Enteater1](http://berserkguard.com/random/cd/sig/banner.png?user=Enteater1 "Enteater1")
-![DevilChief](http://berserkguard.com/random/cd/sig/banner.png?user=DevilChief "DevilChief")
-![PvMe Strike](http://berserkguard.com/random/cd/sig/banner.png?user=PvMe%20Strike "PvMe Strike")
+![Berserkguard](http://berserkguard.com/random/cd/sig/banner.png?user=Berserkguard&theme=0 "Berserkguard")
+![Enteater1](http://berserkguard.com/random/cd/sig/banner.png?user=Enteater1&theme=1 "Enteater1")
+![DevilChief](http://berserkguard.com/random/cd/sig/banner.png?user=DevilChief&theme=2 "DevilChief")
 
 ## Installation
 
