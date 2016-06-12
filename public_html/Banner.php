@@ -29,6 +29,7 @@ class Banner {
         "green"    => 0x009900,
         "gold"     => 0x7E712A,
         "grey"     => 0x333333,
+        "cyan"     => 0x00FFFF,
     );
     
     /** Dimensions of the output banner image. */
@@ -79,7 +80,7 @@ class Banner {
             $this->renderClan($img, 544, 24, 180);
         }
         $this->renderName($img, 5, 28);
-        $this->renderSkills($img, 8, 37, 50, 24);
+        $this->renderSkills($img, 8, 37, 3, 3);
         $this->drawUpdated($img);
         
         imagepng($img);
@@ -121,7 +122,7 @@ class Banner {
         $box = imagettfbbox(12, 0, $this->getFontPath(self::DEFAULT_FONT), $text);
         $textWidth = $box[4] - $box[6];
         
-        $this->drawText($img, 7, self::HEIGHT - 5, 12, $this->colors["white"], $text, self::DEFAULT_FONT);
+        $this->drawText($img, self::WIDTH - $textWidth - 3, self::HEIGHT - 5, 12, $this->colors["white"], $text, self::DEFAULT_FONT);
     }
     
     /**
@@ -221,40 +222,56 @@ class Banner {
     /**
      * Renders the 27 skills on the given image starting at the given (x, y) location, with the spacing specifed.
      */
-    private function renderSkills($img, $x, $y, $xSpacing, $ySpacing) {
+    private function renderSkills($img, $x, $y, $xPadding, $yPadding) {
         $rows = [
+            ["Overall", "XP"],
             ["Attack", "Defence", "Strength", "Constitution", "Ranged", "Prayer", "Magic"],
             ["Cooking", "Woodcutting", "Fletching", "Fishing", "Firemaking", "Crafting", "Smithing"],
             ["Mining", "Herblore", "Agility", "Thieving", "Slayer", "Farming", "Runecrafting"],
             ["Hunter", "Construction", "Summoning", "Dungeoneering", "Divination", "Invention"]
         ];
+        $height = 19;
+        $curY = $y;
         foreach ($rows as $i => $row) {
-            foreach($row as $idx => $skill) {
-                $this->renderSkill($img, $x + $idx * $xSpacing, $y, $this->user["Skills"][$skill]);
+            $curX = $x;
+            foreach ($row as $idx => $name) {
+                $width = 47;
+                if ($name == "Overall") $width = 65;
+                if ($name == "XP") $width = 120;
+                
+                $this->renderSkill($img, $curX, $curY, $width, $height, $this->user["Skills"][$name]);
+                
+                $curX += $width + $xPadding;
             }
-            $y += $ySpacing;
+            $curY += $height + $yPadding;
         }
     }
     
     /**
      * Renders the skill on the given image at the given (x, y) location.
      */
-    private function renderSkill($img, $x, $y, $skill) {
+    private function renderSkill($img, $x, $y, $w, $h, $skill) {
         $levelColor = $this->colors[$skill["Maxed"] ? "gold" : "white"];
         
         $fill = $this->getColor($img, 0x20000000);
-        imagefilledrectangle($img, $x + 19, $y, $x + 47 - 1, $y + 20 - 1, $fill);
+        imagefilledrectangle($img, $x + $h - 1, $y, $x + $w - 1, $y + $h - 1, $fill);
         
-        $this->drawSkillIcon($img, $x, $y, 20, $skill);
-        $this->drawBorder($img, $x, $y, 47, 20, $this->colors[$skill["Maxed"] ? "gold" : "grey"]);
+        $this->drawSkillIcon($img, $x, $y, $h, $skill);
+        $this->drawBorder($img, $x, $y, $w, $h, $this->colors[$skill["Maxed"] ? "gold" : "grey"]);
         
         // Horizontally align level text
-        $text = strval($skill["Level"]);
+        $text = strval(number_format($skill["Name"] == "XP" ? $skill["XP"] : $skill["Level"]));
         $box = imagettfbbox(11, 0, self::RESOURCE_DIR . "fonts/" . self::LEVEL_FONT, $text);
         $textWidth = $box[4] - $box[6];
         
-        $this->drawText($img, ($x + 32) - ($textWidth / 2), $y + 15, 11, $levelColor, $text, self::LEVEL_FONT);
-        $this->drawProgressBar($img, $x + 1, $y + 18, 17, 1, $skill);
+        $this->drawText($img, $x + (($w) - $textWidth) / 2 + $h / 2 - 1, $y + 15, 11, $levelColor, $text, self::LEVEL_FONT);
+        
+        $col1 = $this->colors[$skill["Maxed"] ? "gold" : "green"];
+        $col2 = $this->colors[$skill["Maxed"] ? "gold" : "red"];
+        if ($skill["Name"] == "XP" || $skill["Name"] == "Overall") {
+            $col1 = $this->colors["cyan"];
+        }
+        $this->drawProgressBar($img, $x, $y + $h - 2, $h - 2, 1, $skill["Progress"], $col1, $col2);
     }
     
     /**
@@ -268,7 +285,6 @@ class Banner {
      * Renders the skill icon at the given (x, y) and size.
      */
     private function drawSkillIcon($img, $x, $y, $size, $skill) {
-        
         $icon = @imagecreatefrompng("../resources/skill_icons/" . strtolower($skill["Name"]) . ".png");
         $icon = imagescale($icon, $size, $size, IMG_BICUBIC);
         
@@ -282,13 +298,15 @@ class Banner {
     }
     
     /**
-     * Renders a progress bar for the skill at the given (x, y) location.
+     * Renders a progress bar for the ratio & colors at the given (x, y) location.
      */
-    private function drawProgressBar($img, $x, $y, $w, $h, $skill) {
-        $ratio = $skill["Progress"];
-        
-        imagefilledrectangle($img, $x, $y, $x + $w - 1,            $y + $h - 1, $this->colors[$skill["Maxed"] ? "gold" : "red"]);
-        imagefilledrectangle($img, $x, $y, $x + ($w * $ratio) - 1, $y + $h - 1, $this->colors[$skill["Maxed"] ? "gold" : "green"]);
+    private function drawProgressBar($img, $x, $y, $w, $h, $ratio, $col1, $col2) {
+        $offset = -1;
+        if ($w * $ratio < 1) {
+            $offset = 0;
+        }
+        imagefilledrectangle($img, $x, $y, $x + $w - 1, $y + $h - 1, $col2);
+        imagefilledrectangle($img, $x, $y, $x + ($w * $ratio) + $offset, $y + $h - 1, $col1);
     }
 }
 

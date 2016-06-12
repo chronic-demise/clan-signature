@@ -39,6 +39,9 @@ class HiscoreParser {
         "Slayer", "Farming", "Runecrafting", "Hunter", "Construction", "Summoning", "Dungeoneering", "Divination", "Invention"
     ];
     
+    const MAX_SKILL_XP = 200000000;
+    const MAX_XP = 5400000000;
+    
     /** Total skill experience table, from levels 0 - 120. */
     const XP_TABLE = [
         0,
@@ -267,6 +270,10 @@ class HiscoreParser {
         
         $lines = explode("\n", file_get_contents($dataFile));
         
+        $maxedLevel = 0;
+        $maxedXp = 0;
+        $sumOf99s = 0;
+        $sumOfXp99s = 0;
         for ($i = 0; $i < count(self::SKILLS); $i++) {
             $skillData = explode(",", $lines[$i]);
             
@@ -278,9 +285,13 @@ class HiscoreParser {
             
             $skill["Name"] = self::SKILLS[$i];
             
-            if (self::SKILLS[$i] !== "Overall") {
+            if ($skill["Name"] != "Overall") {
                 $isElite = self::isElite(self::SKILLS[$i]);
                 
+                $maxedLevel += 99;
+                $maxedXp += self::getXpToLevel(99, 0, $isElite);
+                $sumOf99s += $skill["Level"] > 99 ? 99 : $skill["Level"];
+                $sumOfXp99s += $skill["Level"] > 99 ? self::getXpToLevel(99, 0, $isElite) : $skill["XP"]; 
                 if ($skill["Level"] < ($isElite ? 120 : 99)) {
                     $xpNeeded = self::getXpToLevel($skill["Level"] + 1, $skill["XP"], $isElite);
                     $xpCurLevel = self::getXpToLevel($skill["Level"], 0, $isElite);
@@ -295,6 +306,20 @@ class HiscoreParser {
                 }
             }
         }
+        // Overall Level
+        $skill = &$user["Skills"]["Overall"];
+        $maxedLevel = (count(self::SKILLS) - 1) * 99;
+        $skill["Maxed"] = $sumOf99s >= $maxedLevel;
+        $skill["Progress"] = min(1.0, $sumOfXp99s / $maxedXp);
+        
+        // Overall XP
+        $xp = $user["Skills"]["Overall"]["XP"];
+        $user["Skills"]["XP"] = [
+            "Name" => "XP",
+            "Maxed" => ($xp == self::MAX_XP),
+            "Progress" => ($xp / self::MAX_XP),
+            "XP" => $xp
+        ];
         
         $lastLine = $lines[count($lines) - 1];
         if (strpos($lastLine, "{") == 0) {
