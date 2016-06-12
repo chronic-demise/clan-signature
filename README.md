@@ -9,6 +9,13 @@ The project includes an .htaccess for requesting the dynamic image using a .png 
 This is because phpBB will not accept image URLs with a non-common image format extension. Right now the server doesn't
 store any generated images, but regenerates the image from new or cached data. This will likely change in the future.
 
+## Demo
+
+![Berserkguard](http://berserkguard.com/random/cd/sig/banner.png?user=Berserkguard "Berserkguard")
+![Enteater1](http://berserkguard.com/random/cd/sig/banner.png?user=Enteater1 "Enteater1")
+![DevilChief](http://berserkguard.com/random/cd/sig/banner.png?user=DevilChief "DevilChief")
+![PvMe Strike](http://berserkguard.com/random/cd/sig/banner.png?user=PvMe%20Strike "PvMe Strike")
+
 ## Installation
 
 Requires an installation of PHP 5.6 or later on a public-facing webserver.
