@@ -3,7 +3,7 @@
 require_once("Banner.php");
 
 // Our whitelist, hardcoded for now
-$whitelist = array("berserkguard", "enteater1", "timesplitta8", "devilchief");
+$whitelist = array("berserkguard", "enteater1", "timesplitta8", "devilchief", "pvme strike");
 
 // If our username is valid
 if (isset($_GET["user"]) && in_array(strtolower($_GET["user"]), $whitelist)) {

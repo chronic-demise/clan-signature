@@ -2,4 +2,4 @@ RewriteEngine On
 
 # Since phpBB and other forums expect image URLs to end with a common image extension,
 # we have a rewrite rule that lets requests to banner.png be handled by generate.php.
-RewriteRule banner.png$ generate.php
+RewriteRule banner.png generate.php

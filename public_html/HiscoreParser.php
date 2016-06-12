@@ -16,11 +16,17 @@ class HiscoreParser {
     /** Directory to store fetched API data in. */
     const DATA_DIR =  "./data/";
     
-    /** Base URL for accessing the RuneScape clans API. */
-    const BASE_CLAN_URL = "http://hiscore.runescape.com/members_lite.ws?clanName=";
-    
     /** Base URL for accessing the RuneScape user API. */
     const BASE_USER_URL = "http://hiscore.runescape.com/index_lite.ws?player=";
+    
+    /** URL for fetching the user's clan & title. */
+    const USER_WEB_DATA_URL = "http://services.runescape.com/m=website-data/playerDetails.ws?names=[%22{user}%22]&callback=jQuery000000000000000_0000000000";
+    
+    /** Base URL for accessing the RuneScape clans API. */
+    const BASE_CLAN_URL = "http://services.runescape.com/m=clan-hiscores/members_lite.ws?clanName=";
+    
+    /** URL for RuneScape's clan motif image. */
+    const CLAN_MOTIF_URL = "http://services.runescape.com/m=avatar-rs/a=135/{clan}/clanmotif.png";
     
     /** Minimum number of seconds to wait before refetching latest data. */
     const MIN_REFRESH = 24 * 60 * 60;
@@ -78,14 +84,55 @@ class HiscoreParser {
         $name = $this->getNameForURL($clanName);
         $url = self::BASE_CLAN_URL . $name;
         
-        /**
-         * Clanmate, Clan Rank, Total XP, Kills
-         * Enteater1,Owner,597282220,2
-         * Aradonna,Deputy Owner,46289714,0
-         * DevilChief,Coordinator,958624720,1
-         */
+        $curTime = time();
         
-        return "unimplemented";
+        // Make sure we have refetch and data directories.
+        $this->ensureDirExists(self::REFETCH_DIR);
+        $this->ensureDirExists(self::DATA_DIR);
+        
+        // Read the refetch file to see if our data is still valid.
+        $refetchFile = "clan." . $name . ".txt";
+        $needsRefresh = false;
+        $lastUpdated = $curTime;
+        $this->readRefetchFile($refetchFile, $needsRefresh, $lastUpdated, $curTime);
+        
+        // We make a new directory in our data directory for each clan, as we'll be storing multiple
+        // versions of the fetched API data for future datamining.
+        $clanDir = self::DATA_DIR . "clan/" . $name . "/";
+        $this->ensureDirExists($clanDir);
+        
+        // The data file takes the form: {DATA_DIR}/user/berserkguard/1465269902.berserkguard.txt
+        $dataFile = $clanDir . strval($curTime) . "." . $name . ".txt";
+        
+        // For simplicity, we also save the latest copy with the timestamp omitted:
+        // {DATA_DIR}/clan/chronic+demise/chronic+demise.txt
+        $latestDataFile = $clanDir . $name . ".txt";
+        
+        // If we need to refresh the data, fetch latest copy from the RuneScape API.
+        if ($needsRefresh) {
+            $contents = $this->fetchData($url, $refetchFile);
+            
+            file_put_contents($dataFile, $contents);
+            file_put_contents($latestDataFile, $contents);
+            
+            // Fetch the clan's latest motif image too.
+            $motif = str_replace("{clan}", $name, self::CLAN_MOTIF_URL);
+            $motifData = $this->fetch($motif);
+            if ($motifData !== false) {
+                file_put_contents($clanDir . "motif.png", $motifData);
+            }
+        }
+        
+        // Build out the return object.
+        return $this->buildClanData($clanName, $lastUpdated, $latestDataFile);
+    }
+    
+    /**
+     * Returns the clan motif for the given clan. Note the clan must be loaded from 
+     */
+    public function getClanMotif($clan) {
+        $name = $this->getNameForURL($clan);
+        return self::DATA_DIR . "clan/" . $name . "/motif.png";
     }
     
     /**
@@ -101,32 +148,15 @@ class HiscoreParser {
         
         $curTime = time();
         
-        $refetchFile = "user." . $name . ".txt";
-        
         // Make sure we have refetch and data directories.
         $this->ensureDirExists(self::REFETCH_DIR);
         $this->ensureDirExists(self::DATA_DIR);
         
-        // Assume the last update time is the current time. We'll update this if using cached data.
-        $lastUpdated = $curTime;
-        
+        // Read the refetch file to see if our data is still valid.
+        $refetchFile = "user." . $name . ".txt";
         $needsRefresh = false;
-        if (!file_exists(self::REFETCH_DIR . $refetchFile)) {
-            // No refetch file - need to refresh.
-            $needsRefresh = true;
-        } else {
-            // File exists; read it in and check timestamp.
-            $contents = file_get_contents(self::REFETCH_DIR . $refetchFile);
-            $timestamp = intval($contents);
-            
-            if ($timestamp + self::MIN_REFRESH < $curTime) {
-                // We're past the valid cache period - need to refresh.
-                $needsRefresh = true;
-            } else {
-                // Otherwise, make sure we set our last updated time.
-                $lastUpdated = $timestamp;
-            }
-        }
+        $lastUpdated = $curTime;
+        $this->readRefetchFile($refetchFile, $needsRefresh, $lastUpdated, $curTime);
         
         // We make a new directory in our data directory for each user, as we'll be storing multiple
         // versions of the fetched API data for future datamining.
@@ -142,54 +172,18 @@ class HiscoreParser {
         
         // If we need to refresh the data, fetch latest copy from the RuneScape API.
         if ($needsRefresh) {
-            $contents = $this->fetch($url);
+            $contents = $this->fetchData($url, $refetchFile);
             
-            if ($contents !== false) {
-                // Store locally for future datamining.
-                file_put_contents($dataFile, $contents);
-                file_put_contents($latestDataFile, $contents);
-                
-                // Update our last updated blob.
-                file_put_contents(self::REFETCH_DIR . $refetchFile, strval($curTime));
-            }
+            // Also fetch the website data (for clan name & title) & append to payload
+            $json = $this->getWebsiteDataForUser($name);
+            $contents .= "\n" . $json;
+            
+            file_put_contents($dataFile, $contents);
+            file_put_contents($latestDataFile, $contents);
         }
         
         // Build out the return object.
-        $user = [];
-        $user["Name"] = $username;
-        $user["Metadata"]["LastUpdated"] = $lastUpdated;
-        
-        $lines = explode("\n", file_get_contents($latestDataFile));
-        
-        for ($i = 0; $i < count(self::SKILLS); $i++) {
-            $skillData = explode(",", $lines[$i]);
-            
-            $skill = &$user["Skills"][self::SKILLS[$i]];
-            
-            $skill["Rank"] = $skillData[0];
-            $skill["Level"] = $skillData[1];
-            $skill["XP"] = $skillData[2];
-            
-            $skill["Name"] = self::SKILLS[$i];
-            
-            if (self::SKILLS[$i] !== "Overall") {
-                $isElite = self::isElite(self::SKILLS[$i]);
-                
-                if ($skill["Level"] < ($isElite ? 120 : 99)) {
-                    $xpNeeded = self::getXpToLevel($skill["Level"] + 1, $skill["XP"], $isElite);
-                    $xpCurLevel = self::getXpToLevel($skill["Level"], 0, $isElite);
-                    $xpNextLevel = self::getXpToLevel($skill["Level"] + 1, 0, $isElite);
-                    
-                    $ratio = ($skill["XP"] - $xpCurLevel) / ($xpNextLevel - $xpCurLevel);
-                    $skill["Maxed"] = false;
-                    $skill["Progress"] = $ratio;
-                } else {
-                    $skill["Maxed"] = true;
-                    $skill["Progress"] = 1.0;
-                }
-            }
-        }
-        return $user;
+        return $this->buildUserData($username, $lastUpdated, $latestDataFile);
     }
     
     /**
@@ -225,6 +219,133 @@ class HiscoreParser {
     /*****************************************************************************/
     
     /**
+     * Returns the RS website data for the given user. This includes clan name & title.
+     */
+    private function getWebsiteDataForUser($username) {
+        $name = $this->getNameForURL($username);
+        $url = str_replace("{user}", $name, self::USER_WEB_DATA_URL);
+        
+        preg_match("/\{.+\}/", $this->fetch($url), $matches);
+        return $matches[0];
+    }
+    
+    /**
+     * Builds out clan data for the given user data file.
+     */
+    private function buildClanData($clanName, $lastUpdated, $dataFile) {
+        $clan = [];
+        $clan["Name"] = $clanName;
+        $clan["Metadata"]["LastUpdated"] = $lastUpdated;
+        
+        $lines = explode("\n", file_get_contents($dataFile));
+        
+        $clan["Members"] = [];
+        for ($i = 1; $i < count($lines); $i++) {
+            if ($lines[$i] === "") {
+                continue;
+            }
+            $member = explode(",", $lines[$i]);
+            $memberData = [
+                "Name"  => $member[0],
+                "Rank"  => $member[1],
+                "XP"    => $member[2],
+                "Kills" => $member[3],
+            ];
+            $clan["Members"][] = $memberData;
+        }
+        
+        return $clan;
+    }
+    
+    /**
+     * Builds out user data for the given user data file path.
+     */
+    private function buildUserData($username, $lastUpdated, $dataFile) {
+        $user = [];
+        $user["Name"] = $username;
+        $user["Metadata"]["LastUpdated"] = $lastUpdated;
+        
+        $lines = explode("\n", file_get_contents($dataFile));
+        
+        for ($i = 0; $i < count(self::SKILLS); $i++) {
+            $skillData = explode(",", $lines[$i]);
+            
+            $skill = &$user["Skills"][self::SKILLS[$i]];
+            
+            $skill["Rank"] = $skillData[0];
+            $skill["Level"] = $skillData[1];
+            $skill["XP"] = $skillData[2];
+            
+            $skill["Name"] = self::SKILLS[$i];
+            
+            if (self::SKILLS[$i] !== "Overall") {
+                $isElite = self::isElite(self::SKILLS[$i]);
+                
+                if ($skill["Level"] < ($isElite ? 120 : 99)) {
+                    $xpNeeded = self::getXpToLevel($skill["Level"] + 1, $skill["XP"], $isElite);
+                    $xpCurLevel = self::getXpToLevel($skill["Level"], 0, $isElite);
+                    $xpNextLevel = self::getXpToLevel($skill["Level"] + 1, 0, $isElite);
+                    
+                    $ratio = ($skill["XP"] - $xpCurLevel) / ($xpNextLevel - $xpCurLevel);
+                    $skill["Maxed"] = false;
+                    $skill["Progress"] = $ratio;
+                } else {
+                    $skill["Maxed"] = true;
+                    $skill["Progress"] = 1.0;
+                }
+            }
+        }
+        
+        $lastLine = $lines[count($lines) - 1];
+        if (strpos($lastLine, "{") == 0) {
+            // We have JSON data, parse it
+            $obj = json_decode($lastLine, true);
+            
+            $user["Clan"] = $obj["clan"];
+            $user["Title"] = $obj["title"];
+            $user["IsTitleSuffix"] = $obj["isSuffix"];
+        }
+        
+        return $user;
+    }
+    
+    /**
+     * Reads the contents of the specified refecth file, and updates needsRefresh and lastUpdated accordingly.
+     */
+    private function readRefetchFile($file, &$needsRefresh, &$lastUpdated, $curTime) {
+        $needsRefresh = false;
+        $lastUpdated = $curTime;
+        if (!file_exists(self::REFETCH_DIR . $file)) {
+            // No refetch file - need to refresh.
+            $needsRefresh = true;
+        } else {
+            // File exists; read it in and check timestamp.
+            $contents = file_get_contents(self::REFETCH_DIR . $file);
+            $timestamp = intval($contents);
+            
+            if ($timestamp + self::MIN_REFRESH < time()) {
+                // We're past the valid cache period - need to refresh.
+                $needsRefresh = true;
+            } else {
+                // Otherwise, make sure we set our last updated time.
+                $lastUpdated = $timestamp;
+            }
+        }
+    }
+    
+    /**
+     * Fetches data from the URL, 
+     */
+    private function fetchData($url, $refetchFile) {
+        $contents = $this->fetch($url);
+        if ($contents !== false) {
+            // Update our last updated blob.
+            file_put_contents(self::REFETCH_DIR . $refetchFile, strval(time()));
+        }
+        return $contents;
+    }
+    
+    /**
      * Fetches data from the specified URL using cURL.
      */
     private function fetch($url) {
@@ -232,6 +353,7 @@ class HiscoreParser {
         
         curl_setopt($ch, CURLOPT_URL, utf8_encode($url));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
         
         $result = curl_exec($ch);
