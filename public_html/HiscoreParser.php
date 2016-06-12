@@ -22,6 +22,9 @@ class HiscoreParser {
     /** URL for fetching the user's clan & title. */
     const USER_WEB_DATA_URL = "http://services.runescape.com/m=website-data/playerDetails.ws?names=[%22{user}%22]&callback=jQuery000000000000000_0000000000";
     
+    /** URL for a user's chat avatar. */
+    const USER_AVATAR_URL = "http://services.runescape.com/m=avatar-rs/{user}/chat.png";
+    
     /** Base URL for accessing the RuneScape clans API. */
     const BASE_CLAN_URL = "http://services.runescape.com/m=clan-hiscores/members_lite.ws?clanName=";
     
@@ -39,7 +42,10 @@ class HiscoreParser {
         "Slayer", "Farming", "Runecrafting", "Hunter", "Construction", "Summoning", "Dungeoneering", "Divination", "Invention"
     ];
     
+    /** Max XP for any skill */
     const MAX_SKILL_XP = 200000000;
+    
+    /** Max XP across all skills */
     const MAX_XP = 5400000000;
     
     /** Total skill experience table, from levels 0 - 120. */
@@ -131,11 +137,19 @@ class HiscoreParser {
     }
     
     /**
-     * Returns the clan motif for the given clan. Note the clan must be loaded from 
+     * Returns the clan motif for the given clan.
      */
     public function getClanMotif($clan) {
         $name = $this->getNameForURL($clan);
         return self::DATA_DIR . "clan/" . $name . "/motif.png";
+    }
+    
+    /**
+     * Returns the user avatar for the given user. 
+     */
+    public function getUserAvatar($username) {
+        $name = $this->getNameForURL($username);
+        return self::DATA_DIR . "user/" . $name . "/avatar.png";
     }
     
     /**
@@ -181,6 +195,9 @@ class HiscoreParser {
             $json = $this->getWebsiteDataForUser($name);
             $contents .= "\n" . $json;
             
+            $avatarFile = $this->getUserAvatar($name);
+            $avatarContents = $this->getAvatarForUser($name);
+            file_put_contents($avatarFile, $avatarContents);
             file_put_contents($dataFile, $contents);
             file_put_contents($latestDataFile, $contents);
         }
@@ -220,6 +237,16 @@ class HiscoreParser {
     /*****************************************************************************/
     /* Private Functions
     /*****************************************************************************/
+    
+    /**
+     * Fetches & returns the latest avatar image from the RuneScape website.
+     */
+    private function getAvatarForUser($username) {
+        $name = $this->getNameForURL($username);
+        $url = str_replace("{user}", $name, self::USER_AVATAR_URL);
+        
+        return $this->fetch($url);
+    }
     
     /**
      * Returns the RS website data for the given user. This includes clan name & title.
@@ -363,7 +390,7 @@ class HiscoreParser {
      */
     private function fetchData($url, $refetchFile) {
         $contents = $this->fetch($url);
-        if ($contents !== false) {
+        if (isset($refetchFile) && $contents !== false) {
             // Update our last updated blob.
             file_put_contents(self::REFETCH_DIR . $refetchFile, strval(time()));
         }

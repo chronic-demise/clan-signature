@@ -20,7 +20,7 @@ class Banner {
     const NAME_FONT    = "Averia-Regular.ttf";
     const LEVEL_FONT   = "GFSArtemisia.otf";
     
-    /** Named colors (aRGB) to use for rendering. */
+    /** Named colors (RGB) to use for rendering. */
     const COLORS = array(
         "white"    => 0xFFFFFF,
         "black"    => 0x000000,
@@ -35,6 +35,25 @@ class Banner {
     /** Dimensions of the output banner image. */
     const WIDTH = 728;
     const HEIGHT = 150;
+    
+    /** Themes that can be used to change the overall look & feel of the image. */
+    const THEMES = [
+        [
+            "bg" => "bg_06.png",
+            "avatar_bg" => "avatar_bg_02.png",
+            "colors" => [ "on_bg" => 0xFFFFFF, "alt_on_bg" => 0xA91000, "stat_border" => 0x444444 ],
+        ],
+        [
+            "bg" => "bg_02.png",
+            "avatar_bg" => "avatar_bg_01.png",
+            "colors" => [ "on_bg" => 0xFF7F00, "alt_on_bg" => 0x99ff00, "stat_border" => 0x000000 ],
+        ],
+        [
+            "bg" => "bg_07.png",
+            "avatar_bg" => "avatar_bg_03.png",
+            "colors" => [ "on_bg" => 0x000000, "alt_on_bg" => 0x333333, "stat_border" => 0x000000 ],
+        ]
+    ];
     
     /*****************************************************************************/
     /* Variables
@@ -52,16 +71,20 @@ class Banner {
     /** The user's clan data returned by the parser. */
     private $clan;
     
+    /** The theme to use for rendering. */
+    private $theme;
+    
     /*****************************************************************************/
     /* Setup/Cleanup
     /*****************************************************************************/
     
-    public function __construct($username) {
+    public function __construct($username, $theme) {
         $this->parser = new HiscoreParser();
         $this->user = $this->parser->getUser($username);
         if ($this->user["Clan"]) {
             $this->clan = $this->parser->getClan($this->user["Clan"]);
         }
+        $this->theme = self::THEMES[min(max($theme, 0), count(self::THEMES))];
     }
     
     /*****************************************************************************/
@@ -79,8 +102,9 @@ class Banner {
         if ($this->clan) {
             $this->renderClan($img, 544, 24, 180);
         }
-        $this->renderName($img, 5, 28);
-        $this->renderSkills($img, 8, 37, 3, 3);
+        $this->renderAvatar($img, 8, 4, 0.5);
+        $this->renderName($img, 67, 27);
+        $this->renderSkills($img, 8, 34, 3, 3);
         $this->drawUpdated($img);
         
         imagepng($img);
@@ -95,13 +119,18 @@ class Banner {
      * Sets up the base image from the background, and allocates our colors.
      */
     private function setupBanner() {
-        $banner = @imagecreatefrompng(self::RESOURCE_DIR . "banner.png");
+        $theme = $this->theme;
+        
+        $banner = @imagecreatefrompng(self::RESOURCE_DIR . "backgrounds/" . $theme["bg"]);
         $img = @imagecreatetruecolor(self::WIDTH, self::HEIGHT);
         imagecopy($img, $banner, 0, 0, 0, 0, self::WIDTH, self::HEIGHT);
         
         // Build our array of allocated colors
         $this->colors = array();
         foreach (self::COLORS as $color => $num) {
+            $this->colors[$color] = $this->getColor($img, $num);
+        }
+        foreach ($theme["colors"] as $color => $num) {
             $this->colors[$color] = $this->getColor($img, $num);
         }
         return $img;
@@ -122,7 +151,7 @@ class Banner {
         $box = imagettfbbox(12, 0, $this->getFontPath(self::DEFAULT_FONT), $text);
         $textWidth = $box[4] - $box[6];
         
-        $this->drawText($img, self::WIDTH - $textWidth - 3, self::HEIGHT - 5, 12, $this->colors["white"], $text, self::DEFAULT_FONT);
+        $this->drawText($img, self::WIDTH - $textWidth - 3, self::HEIGHT - 5, 12, $this->colors["on_bg"], $text, self::DEFAULT_FONT);
     }
     
     /**
@@ -137,7 +166,7 @@ class Banner {
             $textWidth = $box[4] - $box[6];
         }
         
-        $this->drawText($img, $x + ($width - $textWidth) / 2, $y, $fontSize, $this->colors["white"], $this->clan["Name"], self::LEVEL_FONT);
+        $this->drawText($img, $x + ($width - $textWidth) / 2, $y, $fontSize, $this->colors["on_bg"], $this->clan["Name"], self::LEVEL_FONT);
         $this->renderMotif($img, $x, $y + 6, $width);
     }
     
@@ -177,7 +206,25 @@ class Banner {
         return false;
     }
     
-    /*
+    /**
+     * Renders the user's avatar at the given location.
+     */
+    private function renderAvatar($img, $x, $y, $scale) {
+        $bg = @imagecreatefrompng(self::RESOURCE_DIR . "backgrounds/" . $this->theme["avatar_bg"]);
+        imagecopyresized($img, $bg, $x, $y, 0, 0, imagesx($bg) * $scale, imagesy($bg) * $scale, imagesx($bg), imagesy($bg));
+        
+        $avatar = @imagecreatefrompng($this->parser->getUserAvatar($this->user["Name"]));
+        imagecopyresized($img, $avatar, $x, $y, 0, 0, imagesx($avatar) * $scale, imagesy($avatar) * $scale, imagesx($avatar), imagesy($avatar));
+        
+        $frame = @imagecreatefrompng(self::RESOURCE_DIR . "avatar_frame.png");
+        imagecopyresized($img, $frame, $x, $y, 0, 0, imagesx($frame) * $scale, imagesy($frame) * $scale, imagesx($frame), imagesy($frame));
+        
+        imagedestroy($bg);
+        imagedestroy($avatar);
+        imagedestroy($frame);
+    }
+    
+    /**
      * Draws a border of the given color onto the image at the given location & size.
      */
     private function drawBorder($img, $x, $y, $w, $h, $color) {
@@ -200,22 +247,22 @@ class Banner {
      * Renders the player's name on the given image at the given coordinates.
      */
     private function renderName($img, $x, $y) {
-        if ($this->user["IsTitleSuffix"] || !isset($this->user["Title"])) {
+        if ($this->user["IsTitleSuffix"] || $this->user["Title"] === "") {
             // If suffix or no name
             $box = imagettfbbox(20, 0, $this->getFontPath(self::NAME_FONT), $this->user["Name"]);
             $textWidth = $box[4] - $box[6];
             
-            $this->drawText($img, $x, $y, 20, $this->colors["white"], $this->user["Name"], self::NAME_FONT);
-            if (isset($this->user["Title"])) {
-                $this->drawText($img, $x + 8 + $textWidth, $y, 12, $this->colors["dark red"], $this->user["Title"], self::NAME_FONT);
+            $this->drawText($img, $x, $y, 20, $this->colors["on_bg"], $this->user["Name"], self::NAME_FONT);
+            if (strlen($this->user["Title"]) > 0) {
+                $this->drawText($img, $x + 8 + $textWidth, $y, 12, $this->colors["alt_on_bg"], $this->user["Title"], self::NAME_FONT);
             }
         } else {
             // If prefix
             $box = imagettfbbox(12, 0, $this->getFontPath(self::NAME_FONT), $this->user["Title"]);
             $textWidth = $box[4] - $box[6];
             
-            $this->drawText($img, $x, $y, 12, $this->colors["dark red"], $this->user["Title"], self::NAME_FONT);
-            $this->drawText($img, $x + 8 + $textWidth, $y, 20, $this->colors["white"], $this->user["Name"], self::NAME_FONT);
+            $this->drawText($img, $x, $y, 12, $this->colors["alt_on_bg"], $this->user["Title"], self::NAME_FONT);
+            $this->drawText($img, $x + 8 + $textWidth, $y, 20, $this->colors["on_bg"], $this->user["Name"], self::NAME_FONT);
         }
     }
     
@@ -224,20 +271,31 @@ class Banner {
      */
     private function renderSkills($img, $x, $y, $xPadding, $yPadding) {
         $rows = [
-            ["Overall", "XP"],
+            [60, "Overall", "XP"],
             ["Attack", "Defence", "Strength", "Constitution", "Ranged", "Prayer", "Magic"],
             ["Cooking", "Woodcutting", "Fletching", "Fishing", "Firemaking", "Crafting", "Smithing"],
             ["Mining", "Herblore", "Agility", "Thieving", "Slayer", "Farming", "Runecrafting"],
             ["Hunter", "Construction", "Summoning", "Dungeoneering", "Divination", "Invention"]
         ];
-        $height = 19;
         $curY = $y;
         foreach ($rows as $i => $row) {
             $curX = $x;
             foreach ($row as $idx => $name) {
+                if (is_numeric($name)) {
+                    $curX += $name;
+                    continue;
+                }
+                
                 $width = 47;
-                if ($name == "Overall") $width = 65;
-                if ($name == "XP") $width = 120;
+                $height = 19;
+                if ($name == "Overall") {
+                    $width = 70;
+                    $height = 24;
+                }
+                if ($name == "XP") {
+                    $width = 130;
+                    $height = 24;
+                }
                 
                 $this->renderSkill($img, $curX, $curY, $width, $height, $this->user["Skills"][$name]);
                 
@@ -257,21 +315,24 @@ class Banner {
         imagefilledrectangle($img, $x + $h - 1, $y, $x + $w - 1, $y + $h - 1, $fill);
         
         $this->drawSkillIcon($img, $x, $y, $h, $skill);
-        $this->drawBorder($img, $x, $y, $w, $h, $this->colors[$skill["Maxed"] ? "gold" : "grey"]);
+        $this->drawBorder($img, $x, $y, $w, $h, $this->colors[$skill["Maxed"] ? "gold" : "stat_border"]);
         
         // Horizontally align level text
+        $fontSize = 11;
         $text = strval(number_format($skill["Name"] == "XP" ? $skill["XP"] : $skill["Level"]));
-        $box = imagettfbbox(11, 0, self::RESOURCE_DIR . "fonts/" . self::LEVEL_FONT, $text);
+        $box = imagettfbbox($fontSize, 0, self::RESOURCE_DIR . "fonts/" . self::LEVEL_FONT, $text);
         $textWidth = $box[4] - $box[6];
         
-        $this->drawText($img, $x + (($w) - $textWidth) / 2 + $h / 2 - 1, $y + 15, 11, $levelColor, $text, self::LEVEL_FONT);
+        $textX = $x + ($w - $textWidth) / 2.0 + $h / 2 - 1;
+        $textY = $y + ($h - $fontSize) / 2.0 + $fontSize;
+        $this->drawText($img, $textX, $textY, $fontSize, $levelColor, $text, self::LEVEL_FONT);
         
         $col1 = $this->colors[$skill["Maxed"] ? "gold" : "green"];
         $col2 = $this->colors[$skill["Maxed"] ? "gold" : "red"];
         if ($skill["Name"] == "XP" || $skill["Name"] == "Overall") {
             $col1 = $this->colors["cyan"];
         }
-        $this->drawProgressBar($img, $x, $y + $h - 2, $h - 2, 1, $skill["Progress"], $col1, $col2);
+        $this->drawProgressBar($img, $x + 1, $y + $h - 2, $h - 3, 1, $skill["Progress"], $col1, $col2);
     }
     
     /**
@@ -285,10 +346,10 @@ class Banner {
      * Renders the skill icon at the given (x, y) and size.
      */
     private function drawSkillIcon($img, $x, $y, $size, $skill) {
-        $icon = @imagecreatefrompng("../resources/skill_icons/" . strtolower($skill["Name"]) . ".png");
+        $icon = @imagecreatefrompng(self::RESOURCE_DIR . "/skill_icons/" . strtolower($skill["Name"]) . ".png");
         $icon = imagescale($icon, $size, $size, IMG_BICUBIC);
         
-        $bg = @imagecreatefrompng("../resources/" . ($skill["Maxed"] ? "maxed" : "normal") . "_bg.png");
+        $bg = @imagecreatefrompng(self::RESOURCE_DIR . ($skill["Maxed"] ? "maxed" : "normal") . "_bg.png");
         $bg = imagescale($bg, $size, $size, IMG_BICUBIC);
         imagecopy($bg, $icon, 0, 0, 0, 0, $size, $size);
         imagecopy($img, $bg, $x, $y, 1, 1, $size - 1, $size - 1);
