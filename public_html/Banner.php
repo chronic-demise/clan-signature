@@ -21,7 +21,7 @@ class Banner {
     const LEVEL_FONT   = "GFSArtemisia.otf";
     
     /** Named colors (RGB) to use for rendering. */
-    const COLORS = array(
+    const COLORS = [
         "white"    => 0xFFFFFF,
         "black"    => 0x000000,
         "red"      => 0x990000,
@@ -29,8 +29,8 @@ class Banner {
         "green"    => 0x009900,
         "gold"     => 0x7E712A,
         "grey"     => 0x333333,
-        "cyan"     => 0x00FFFF,
-    );
+        "cyan"     => 0x0099BB,
+    ];
     
     /** Dimensions of the output banner image. */
     const WIDTH = 728;
@@ -96,7 +96,6 @@ class Banner {
      */
     public function render() {
         header("Content-Type: image/png");
-        
         $img = $this->setupBanner();
         
         if ($this->clan) {
@@ -291,8 +290,7 @@ class Banner {
                 if ($name == "Overall") {
                     $width = 70;
                     $height = 24;
-                }
-                if ($name == "XP") {
+                } else if ($name == "XP") {
                     $width = 130;
                     $height = 24;
                 }
@@ -309,17 +307,20 @@ class Banner {
      * Renders the skill on the given image at the given (x, y) location.
      */
     private function renderSkill($img, $x, $y, $w, $h, $skill) {
-        $levelColor = $this->colors[$skill["Maxed"] ? "gold" : "white"];
-        
+        $levelColor =  $this->colors[self::getOption($skill, "white",       "gold",   "cyan")];
+        $borderColor = $this->colors[self::getOption($skill, "stat_border", "gold",   "cyan")];
+        $col1 =        $this->colors[self::getOption($skill, "green",       "cyan",   "cyan")];
+        $col2 =        $this->colors[self::getOption($skill, "red",         "red",    "cyan")];
+
         $fill = $this->getColor($img, 0x20000000);
         imagefilledrectangle($img, $x + $h - 1, $y, $x + $w - 1, $y + $h - 1, $fill);
         
         $this->drawSkillIcon($img, $x, $y, $h, $skill);
-        $this->drawBorder($img, $x, $y, $w, $h, $this->colors[$skill["Maxed"] ? "gold" : "stat_border"]);
+        $this->drawBorder($img, $x, $y, $w, $h, $borderColor);
         
         // Horizontally align level text
         $fontSize = 11;
-        $text = strval(number_format($skill["Name"] == "XP" ? $skill["XP"] : $skill["Level"]));
+        $text = strval(number_format($skill["Name"] == "XP" ? $skill["XP"] : $skill["Virtual"]));
         $box = imagettfbbox($fontSize, 0, self::RESOURCE_DIR . "fonts/" . self::LEVEL_FONT, $text);
         $textWidth = $box[4] - $box[6];
         
@@ -327,14 +328,30 @@ class Banner {
         $textY = $y + ($h - $fontSize) / 2.0 + $fontSize;
         $this->drawText($img, $textX, $textY, $fontSize, $levelColor, $text, self::LEVEL_FONT);
         
-        $col1 = $this->colors[$skill["Maxed"] ? "gold" : "green"];
-        $col2 = $this->colors[$skill["Maxed"] ? "gold" : "red"];
-        if ($skill["Name"] == "XP" || $skill["Name"] == "Overall") {
-            $col1 = $this->colors["cyan"];
-        }
         $this->drawProgressBar($img, $x + 1, $y + $h - 2, $h - 3, 1, $skill["Progress"], $col1, $col2);
     }
     
+    /**
+     * Returns opt3 if skill is true maxed, opt2 if skill is maxed, opt1 otherwise.
+     */
+    private static function getOption($skill, $opt1, $opt2, $opt3) {
+        // For Overall skill, used maxed status instead of level to determine colors.
+        if ($skill["Name"] == "Overall")
+            return $skill["Maxed"] ? $opt2 : $opt1;
+        
+        // Always use lowest option for total XP
+        if ($skill["Name"] == "XP") {
+            return $opt1;
+        }
+        
+        // All other (normal) skills - use the level
+        if ($skill["Virtual"] < 99)
+            return $opt1;
+        if ($skill["Virtual"] < 120)
+            return $opt2;
+        return $opt3;
+    }
+
     /**
      * Renders text at the given (x, y) with the given size, color, and font.
      */
@@ -349,7 +366,7 @@ class Banner {
         $icon = @imagecreatefrompng(self::RESOURCE_DIR . "/skill_icons/" . strtolower($skill["Name"]) . ".png");
         $icon = imagescale($icon, $size, $size, IMG_BICUBIC);
         
-        $bg = @imagecreatefrompng(self::RESOURCE_DIR . ($skill["Maxed"] ? "maxed" : "normal") . "_bg.png");
+        $bg = @imagecreatefrompng(self::RESOURCE_DIR . self::getOption($skill, "normal", "maxed", "true") . "_bg.png");
         $bg = imagescale($bg, $size, $size, IMG_BICUBIC);
         imagecopy($bg, $icon, 0, 0, 0, 0, $size, $size);
         imagecopy($img, $bg, $x, $y, 1, 1, $size - 1, $size - 1);

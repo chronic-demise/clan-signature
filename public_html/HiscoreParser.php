@@ -94,7 +94,6 @@ class HiscoreParser {
         $url = self::BASE_CLAN_URL . $name;
         
         $curTime = time();
-        
         // Make sure we have refetch and data directories.
         $this->ensureDirExists(self::REFETCH_DIR);
         $this->ensureDirExists(self::DATA_DIR);
@@ -110,7 +109,7 @@ class HiscoreParser {
         $clanDir = self::DATA_DIR . "clan/" . $name . "/";
         $this->ensureDirExists($clanDir);
         
-        // The data file takes the form: {DATA_DIR}/user/berserkguard/1465269902.berserkguard.txt
+        // The data file takes the form: {DATA_DIR}/clan/chronic+demise/1465269902.chronic+demise.txt
         $dataFile = $clanDir . strval($curTime) . "." . $name . ".txt";
         
         // For simplicity, we also save the latest copy with the timestamp omitted:
@@ -207,13 +206,29 @@ class HiscoreParser {
     }
     
     /**
-     * Returns true if the specified skill name is an elite skill, else false.
+     * Returns the level based on the given xp.
+     */
+    public static function getLevelFromXp($xp, $isElite) {
+        $level = 2;
+        
+        while ($level <= 120 && $xp > self::getXpToLevel($level, 0, $isElite)) {
+            $level++;
+        }
+        return $level - 1;
+    }
+    
+    /**
+     * Returns the total XP needed to get to the given level, less the given current XP.
      */
     public static function getXpToLevel($level, $curXp, $isElite) {
-        if ($isElite) {
-            return self::ELITE_XP_TABLE[$level] - $curXp;
+        if ($level > 120) {
+            $level = 120;
         }
-        return self::XP_TABLE[$level] - $curXp;
+        
+        if ($isElite) {
+            return max(0, self::ELITE_XP_TABLE[$level] - $curXp);
+        }
+        return max(0, self::XP_TABLE[$level] - $curXp);
     }
     
     /**
@@ -301,43 +316,47 @@ class HiscoreParser {
         $maxedXp = 0;
         $sumOf99s = 0;
         $sumOfXp99s = 0;
+        $totalLevel = 0;
         for ($i = 0; $i < count(self::SKILLS); $i++) {
             $skillData = explode(",", $lines[$i]);
             
+            $isElite = self::isElite(self::SKILLS[$i]);
+            
             $skill = &$user["Skills"][self::SKILLS[$i]];
             
+            $skill["Name"] = self::SKILLS[$i];
             $skill["Rank"] = $skillData[0];
-            $skill["Level"] = $skillData[1];
+            $skill["Level"] = $skillData[1];            
             $skill["XP"] = $skillData[2];
             
-            $skill["Name"] = self::SKILLS[$i];
-            
             if ($skill["Name"] != "Overall") {
-                $isElite = self::isElite(self::SKILLS[$i]);
+                $skill["Virtual"] = self::getLevelFromXp($skill["XP"], $isElite);
+                $skill["Maxed"] = ($skill["Level"] >= 99);
                 
-                $maxedLevel += 99;
+                $totalLevel += $skill["Level"];
+                
                 $maxedXp += self::getXpToLevel(99, 0, $isElite);
                 $sumOf99s += $skill["Level"] > 99 ? 99 : $skill["Level"];
                 $sumOfXp99s += $skill["Level"] > 99 ? self::getXpToLevel(99, 0, $isElite) : $skill["XP"]; 
-                if ($skill["Level"] < ($isElite ? 120 : 99)) {
-                    $xpNeeded = self::getXpToLevel($skill["Level"] + 1, $skill["XP"], $isElite);
-                    $xpCurLevel = self::getXpToLevel($skill["Level"], 0, $isElite);
-                    $xpNextLevel = self::getXpToLevel($skill["Level"] + 1, 0, $isElite);
+                if ($skill["Virtual"] < 120) {
+                    $xpNeeded = self::getXpToLevel($skill["Virtual"] + 1, $skill["XP"], $isElite);
+                    $xpCurLevel = self::getXpToLevel($skill["Virtual"], 0, $isElite);
+                    $xpNextLevel = self::getXpToLevel($skill["Virtual"] + 1, 0, $isElite);
                     
                     $ratio = ($skill["XP"] - $xpCurLevel) / ($xpNextLevel - $xpCurLevel);
-                    $skill["Maxed"] = false;
                     $skill["Progress"] = $ratio;
                 } else {
-                    $skill["Maxed"] = true;
                     $skill["Progress"] = 1.0;
                 }
             }
         }
+        
         // Overall Level
         $skill = &$user["Skills"]["Overall"];
         $maxedLevel = (count(self::SKILLS) - 1) * 99;
-        $skill["Maxed"] = $sumOf99s >= $maxedLevel;
+        $skill["Maxed"] = ($sumOf99s >= $maxedLevel);
         $skill["Progress"] = min(1.0, $sumOfXp99s / $maxedXp);
+        $skill["Virtual"] = $totalLevel;
         
         // Overall XP
         $xp = $user["Skills"]["Overall"]["XP"];
@@ -345,7 +364,8 @@ class HiscoreParser {
             "Name" => "XP",
             "Maxed" => ($xp == self::MAX_XP),
             "Progress" => ($xp / self::MAX_XP),
-            "XP" => $xp
+            "XP" => $xp,
+            "Virtual" => 0
         ];
         
         $lastLine = $lines[count($lines) - 1];
@@ -432,7 +452,7 @@ class HiscoreParser {
         if (!preg_match("/^[a-zA-Z0-9\+]+$/", $name)) {
             return urlencode(strtolower(trim($name)));
         }
-        return $name;
+        return strtolower($name);
     }
 }
 
