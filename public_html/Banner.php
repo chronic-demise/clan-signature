@@ -52,6 +52,21 @@ class Banner {
             "bg" => "bg_07.png",
             "avatar_bg" => "avatar_bg_03.png",
             "colors" => [ "on_bg" => 0x000000, "alt_on_bg" => 0x333333, "stat_border" => 0x000000 ],
+        ],
+        [
+            "bg" => "bg_01.png",
+            "avatar_bg" => "avatar_bg_02.png",
+            "colors" => [ "on_bg" => 0x00FFFF, "alt_on_bg" => 0xFFFFFF, "stat_border" => 0x000000 ],
+        ],
+        [
+            "bg" => "bg_03.png",
+            "avatar_bg" => "avatar_bg_02.png",
+            "colors" => [ "on_bg" => 0x99AADD, "alt_on_bg" => 0xFFFFFF, "stat_border" => 0x000000 ],
+        ],
+        [
+            "bg" => "bg_04.png",
+            "avatar_bg" => "avatar_bg_02.png",
+            "colors" => [ "on_bg" => 0x002200, "alt_on_bg" => 0x00FF00, "stat_border" => 0x000000 ],
         ]
     ];
     

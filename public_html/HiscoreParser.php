@@ -49,7 +49,7 @@ class HiscoreParser {
     const MAX_SKILL_XP = 200000000;
     
     /** Max XP across all skills */
-    const MAX_XP = NUM_SKILLS * MAX_SKILL_XP;
+    const MAX_XP = self::NUM_SKILLS * self::MAX_SKILL_XP;
     
     /** Total skill experience table, from levels 0 - 120. */
     const XP_TABLE = [
@@ -217,7 +217,8 @@ class HiscoreParser {
     public static function getLevelFromXp($xp, $isElite) {
         $level = 2;
         
-        while ($level <= 120 && $xp > self::getXpToLevel($level, 0, $isElite)) {
+        $maxLevel = ($isElite ? 150 : 120);
+        while ($level <= $maxLevel && $xp > self::getXpToLevel($level, 0, $isElite)) {
             $level++;
         }
         return $level - 1;
