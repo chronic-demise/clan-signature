@@ -17,7 +17,7 @@ class HiscoreParser {
     const DATA_DIR =  "./data/";
     
     /** Base URL for accessing the RuneScape user API. */
-    const BASE_USER_URL = "http://hiscore.runescape.com/index_lite.ws?player=";
+    const BASE_USER_URL = "http://services.runescape.com/m=hiscore/index_lite.ws?player=";
     
     /** URL for fetching the user's clan & title. */
     const USER_WEB_DATA_URL = "http://services.runescape.com/m=website-data/playerDetails.ws?names=[%22{user}%22]&callback=jQuery000000000000000_0000000000";
@@ -338,7 +338,7 @@ class HiscoreParser {
             
             $skill["Name"] = self::SKILLS[$i];
             $skill["Rank"] = $skillData[0];
-            $skill["Level"] = $skillData[1];            
+            $skill["Level"] = $skillData[1];
             $skill["XP"] = $skillData[2];
             
             if ($skill["Name"] != "Overall") {
@@ -349,7 +349,7 @@ class HiscoreParser {
                 
                 $maxedXp += self::getXpToLevel(99, 0, $isElite);
                 $sumOf99s += $skill["Level"] > 99 ? 99 : $skill["Level"];
-                $sumOfXp99s += $skill["Level"] > 99 ? self::getXpToLevel(99, 0, $isElite) : $skill["XP"]; 
+                $sumOfXp99s += $skill["Level"] > 99 ? self::getXpToLevel(99, 0, $isElite) : $skill["XP"];
                 if ($skill["Virtual"] < 120) {
                     $xpNeeded = self::getXpToLevel($skill["Virtual"] + 1, $skill["XP"], $isElite);
                     $xpCurLevel = self::getXpToLevel($skill["Virtual"], 0, $isElite);
@@ -418,7 +418,7 @@ class HiscoreParser {
     }
     
     /**
-     * Fetches data from the URL, 
+     * Fetches data from the URL
      */
     private function fetchData($url, $refetchFile) {
         $contents = $this->fetch($url);

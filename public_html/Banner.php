@@ -12,8 +12,8 @@ class Banner {
     /* Constants
     /*****************************************************************************/
     
-    /** Directory to store refetch timestamps in. */
-    const RESOURCE_DIR = "../resources/";
+    /** Directory to store refetch timestamps in, relative to $_SERVER['DOCUMENT_ROOT'] */
+    const RESOURCE_DIR = "/resources/";
     
     /** Fonts to use for text rendering. */
     const DEFAULT_FONT = "GFSArtemisia.otf";
@@ -135,7 +135,7 @@ class Banner {
     private function setupBanner() {
         $theme = $this->theme;
         
-        $banner = @imagecreatefrompng(self::RESOURCE_DIR . "backgrounds/" . $theme["bg"]);
+        $banner = @imagecreatefrompng($this->getResourcePath() . "backgrounds/" . $theme["bg"]);
         $img = @imagecreatetruecolor(self::WIDTH, self::HEIGHT);
         imagecopy($img, $banner, 0, 0, 0, 0, self::WIDTH, self::HEIGHT);
         
@@ -151,10 +151,17 @@ class Banner {
     }
     
     /**
+     * Returns the path to the resource folder.
+     */
+    private function getResourcePath() {
+        return $_SERVER['DOCUMENT_ROOT'] . self::RESOURCE_DIR;
+    }
+    
+    /**
      * Returns the path to the specified font.
      */
     private function getFontPath($font) {
-        return self::RESOURCE_DIR . "fonts/" . $font;
+        return $this->getResourcePath() . "fonts/" . $font;
     }
     
     /**
@@ -190,7 +197,7 @@ class Banner {
     private function renderMotif($img, $x, $y, $width) {
         if ($this->clan) {
             $barScale = 0.3;
-            $bar = @imagecreatefrompng(self::RESOURCE_DIR . "motif_bar.png");
+            $bar = @imagecreatefrompng($this->getResourcePath() . "motif_bar.png");
             $barW = imagesx($bar);
             $barH = imagesy($bar);
             
@@ -222,7 +229,7 @@ class Banner {
      * Renders the user's avatar at the given location.
      */
     private function renderAvatar($img, $x, $y, $scale) {
-        $bg = @imagecreatefrompng(self::RESOURCE_DIR . "backgrounds/" . $this->theme["avatar_bg"]);
+        $bg = @imagecreatefrompng($this->getResourcePath() . "backgrounds/" . $this->theme["avatar_bg"]);
         imagecopyresized($img, $bg, $x, $y, 0, 0, imagesx($bg) * $scale, imagesy($bg) * $scale, imagesx($bg), imagesy($bg));
         
         $avatar = @imagecreatefrompng($this->parser->getUserAvatar($this->user["Name"]));
@@ -231,7 +238,7 @@ class Banner {
             imagedestroy($avatar);
         }
         
-        $frame = @imagecreatefrompng(self::RESOURCE_DIR . "avatar_frame.png");
+        $frame = @imagecreatefrompng($this->getResourcePath() . "avatar_frame.png");
         imagecopyresized($img, $frame, $x, $y, 0, 0, imagesx($frame) * $scale, imagesy($frame) * $scale, imagesx($frame), imagesy($frame));
         
         imagedestroy($bg);
@@ -336,7 +343,7 @@ class Banner {
         // Horizontally align level text
         $fontSize = 11;
         $text = strval(number_format($skill["Name"] == "XP" ? $skill["XP"] : $skill["Virtual"]));
-        $box = imagettfbbox($fontSize, 0, self::RESOURCE_DIR . "fonts/" . self::LEVEL_FONT, $text);
+        $box = imagettfbbox($fontSize, 0, $this->getFontPath(self::LEVEL_FONT), $text);
         $textWidth = $box[4] - $box[6];
         
         $textX = $x + ($w - $textWidth) / 2.0 + $h / 2 - 1;
@@ -371,17 +378,17 @@ class Banner {
      * Renders text at the given (x, y) with the given size, color, and font.
      */
     private function drawText($img, $x, $y, $size, $color, $text, $font = self::DEFAULT_FONT) {
-        imagettftext($img, $size, 0, $x, $y, $color, self::RESOURCE_DIR . "fonts/" . $font, $text);
+        imagettftext($img, $size, 0, $x, $y, $color, $this->getFontPath($font), $text);
     }
     
     /**
      * Renders the skill icon at the given (x, y) and size.
      */
     private function drawSkillIcon($img, $x, $y, $size, $skill) {
-        $icon = @imagecreatefrompng(self::RESOURCE_DIR . "/skill_icons/" . strtolower($skill["Name"]) . ".png");
+        $icon = @imagecreatefrompng($this->getResourcePath() . "skill_icons/" . strtolower($skill["Name"]) . ".png");
         $icon = imagescale($icon, $size, $size, IMG_BICUBIC);
         
-        $bg = @imagecreatefrompng(self::RESOURCE_DIR . self::getOption($skill, "normal", "maxed", "true") . "_bg.png");
+        $bg = @imagecreatefrompng($this->getResourcePath() . self::getOption($skill, "normal", "maxed", "true") . "_bg.png");
         $bg = imagescale($bg, $size, $size, IMG_BICUBIC);
         imagecopy($bg, $icon, 0, 0, 0, 0, $size, $size);
         imagecopy($img, $bg, $x, $y, 1, 1, $size - 1, $size - 1);
