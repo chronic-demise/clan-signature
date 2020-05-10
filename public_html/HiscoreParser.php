@@ -43,7 +43,7 @@ class HiscoreParser {
     ];
     
     /** Number of skills in RuneScape. Note that this number < count(self::SKILLS) */
-    const NUM_SKILLS = 27;
+    const NUM_SKILLS = 28;
 
     /** Max XP for any skill */
     const MAX_SKILL_XP = 200000000;
